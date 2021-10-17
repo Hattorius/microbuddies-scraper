@@ -1,0 +1,12 @@
+{
+  "name": "microbuddies-scraper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/Hattorius/microbuddies-scraper.git",
+  "author": "Aaron Jonk <AJ@jonk.name>",
+  "license": "MIT",
+  "dependencies": {
+    "ts-node": "^10.3.0",
+    "ts-node-dev": "^1.1.8"
+  }
+}
