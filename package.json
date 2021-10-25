@@ -6,6 +6,9 @@
   "author": "Aaron Jonk <AJ@jonk.name>",
   "license": "MIT",
   "dependencies": {
+    "@types/node": "^16.11.1",
+    "dotenv": "^10.0.0",
+    "moralis": "^0.0.95",
     "ts-node": "^10.3.0",
     "ts-node-dev": "^1.1.8",
     "typescript": "^4.4.4"
