@@ -19,8 +19,6 @@ import { Moralis } from 'moralis/node';
         const options = { chain: "mumbai", address: "0xdcfddb06af6f1a8d4be001c43b0f3e29bfbd96db", offset: allNFTs.length };
         const nftOwners = await Moralis.Web3API.token.getNFTOwners(options);
         allNFTs = allNFTs.concat(nftOwners.result);
-        console.log(allNFTs[0]);
-        return;
         if (allNFTs.length >= nftOwners.total) {
             gettingNFTs = false;
         }
