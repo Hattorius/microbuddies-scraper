@@ -6,9 +6,11 @@
   "author": "Aaron Jonk <AJ@jonk.name>",
   "license": "MIT",
   "dependencies": {
+    "@types/mysql": "^2.15.19",
     "@types/node": "^16.11.1",
     "dotenv": "^10.0.0",
     "moralis": "^0.0.95",
+    "mysql": "^2.18.1",
     "ts-node": "^10.3.0",
     "ts-node-dev": "^1.1.8",
     "typescript": "^4.4.4"
