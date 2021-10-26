@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 config();
 import { Moralis } from 'moralis/node';
 import * as mysql from 'mysql';
+import { chunk } from './functions';
 
 var connection = mysql.createConnection({
     host: process.env.mysql_host,
@@ -22,59 +23,66 @@ connection.connect();
     const metaData = await Moralis.Web3API.token.getNFTMetadata(options);
     console.log("Receiving " + metaData.name);
 
-    var gettingNFTs = true;
     var allNFTs = [];
-    while (gettingNFTs) {
-        const options = { chain: "mumbai", address: "0xdcfddb06af6f1a8d4be001c43b0f3e29bfbd96db", offset: allNFTs.length };
+    var allTraits = [];
+    var skipped = 0;
+    while (true) {
+        const options = { chain: "mumbai", address: "0xdcfddb06af6f1a8d4be001c43b0f3e29bfbd96db", offset: ((allNFTs.length + skipped)) , order: "block_number.DESC"};
         const nftOwners = await Moralis.Web3API.token.getNFTOwners(options);
-        allNFTs = allNFTs.concat(nftOwners.result);
-        if (allNFTs.length >= nftOwners.total) {
-            gettingNFTs = false;
-        }
-    }
-    console.log("Got all " + allNFTs.length.toString() + " Microbuddies metadata");
+        const NFTs = nftOwners.result;
+        for (var i = 0; i < NFTs.length; i++) {
+            if (NFTs[i].metadata == null) {
+                skipped++;
+                continue;
+            }
 
-    var err = [];
-    for (var i = 0; i < allNFTs.length; i++) {
-        const nftMetadata = JSON.parse(allNFTs[i].metadata);
-        var nft = {};
-        try {
-            nft = {
-                token_id: allNFTs[i].token_id,
-                owner: allNFTs[i].owner_of,
-                block_updated: allNFTs[i].block_number,
-                block_minted: allNFTs[i].block_number_minted,
-                name: nftMetadata.name,
-                type: nftMetadata.name.split(' ').at(-1),
-                quote: nftMetadata.description.split('"')[1],
-                gen: nftMetadata.attributes[1].value,
-                attributes: JSON.stringify(nftMetadata.dominants),
-                recessive: JSON.stringify(nftMetadata.recessives),
-                background_type: nftMetadata.attributes.at(-1).value
-            };
-        } catch (grr) {
-            err.push(allNFTs[i].token_id);
-            continue;
-        }
-        connection.query("INSERT INTO microbuddies SET ?", nft, (err, res, f) => {  });
+            const nft = NFTs[i];
+            const nftMetadata = JSON.parse(nft.metadata);
+            allNFTs.push([
+                nft.token_id,
+                nft.owner_of,
+                nft.block_number,
+                nft.block_number_minted,
+                nftMetadata.name.split(' ')[0],
+                nftMetadata.name.split(' ').at(-1),
+                nftMetadata.description.split('"')[1],
+                nftMetadata.attributes[1].value,
+                JSON.stringify(nftMetadata.dominants),
+                JSON.stringify(nftMetadata.recessives),
+                nftMetadata.attributes.at(-1).value
+            ]);
 
-        const traits = nftMetadata.recessives.concat(nftMetadata.dominants);
-        for (var ii = 0; ii < traits.length; ii++) {
-            const recessive = traits[ii];
-            var mutation = 0;
-            if (recessive.mutation) mutation = 1;
-            const traitValue = recessive.value.split(' ');
-            const trait = {
-                buddy_type: nftMetadata.name.split(' ').at(-1),
-                type: recessive.type,
-                mutation: mutation,
-                rarity: recessive.rarity,
-                value: traitValue[0],
-                name: traitValue[1],
-                uniQid: nftMetadata.name.split(' ').at(-1)+recessive.value
-            };
-            connection.query("INSERT INTO traits SET ?", trait, (err, res, f) => {  });
+            const buddyTraits = nftMetadata.dominants.concat(nftMetadata.recessives);
+            for (var ii = 0; ii < buddyTraits.length; ii++) {
+                const buddyTrait = buddyTraits[ii];
+                var mutation = 0;
+                if (buddyTrait.mutation) mutation = 1;
+                allTraits.push([
+                    nftMetadata.name.split(' ').at(-1),
+                    buddyTrait.type,
+                    mutation,
+                    buddyTrait.rarity,
+                    buddyTrait.value.split(' ')[0],
+                    buddyTrait.value.split(' ')[1],
+                    nftMetadata.name.split(' ').at(-1)+buddyTrait.value
+                ]);
+            }
         }
+
+        if (allNFTs.length+skipped >= nftOwners.total) {
+            break;
+        }
+        console.log((allNFTs.length+skipped).toString() + "/" + nftOwners.total.toString());
     }
-    console.log(err);
+    console.log("Received all Blockchain data and parsed it - pushing to database");
+    const chunkedAllNFTs = chunk(allNFTs, 500);
+    for (var i = 0; i < chunkedAllNFTs.length; i++) {
+        connection.query("INSERT IGNORE INTO microbuddies (token_id, owner, block_updated, block_minted, name, type, quote, gen, attributes, recessive, background_type) VALUES ?", [chunkedAllNFTs[i]]);
+    }
+    const chunkedAllTraits = chunk(allTraits, 500);
+    for (var i = 0; i < chunkedAllTraits.length; i++) {
+        connection.query("INSERT IGNORE INTO traits (buddy_type, type, mutation, rarity, value, name, uniQid) VALUES ?", [chunkedAllTraits[i]]);
+    }
+    console.log("Pushed to database!");
+    connection.end();
 })();
